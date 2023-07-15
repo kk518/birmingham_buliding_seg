@@ -5,7 +5,7 @@ from tqdm import tqdm
 from torch.utils.data import Dataset
 
 class  BMHDataset(Dataset):
-    def __init__(self, split='train', data_root='trainval_fullarea', num_point=4096, test_area=[2,8], block_size=1.0,
+    def __init__(self, split='train', data_root='trainval_fullarea', num_point=4096, test_area=[9,10], block_size=1.0,
                  sample_rate=1.0, transform=None):
         super().__init__()
         self.num_point = num_point
@@ -111,7 +111,7 @@ if __name__ == '__main__':
     torch.cuda.manual_seed_all(manual_seed)
     def worker_init_fn(worker_id):
         random.seed(manual_seed + worker_id)
-    train_loader = torch.utils.data.DataLoader(point_data, batch_size=16, shuffle=True, num_workers=16, pin_memory=True, worker_init_fn=worker_init_fn)
+    train_loader = torch.utils.data.DataLoader(point_data, batch_size=16, shuffle=True, num_workers=16, pin_memory=True)
     for idx in range(4):
         end = time.time()
         for i, (input, target) in enumerate(train_loader):

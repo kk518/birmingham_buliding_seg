@@ -21,13 +21,13 @@ if __name__ == '__main__':
     for filename in filenames:
          print("正在处理第",format(filename))
          path = IMPORT_PATH+"/"+filename
-         xyz, rgb, labels = DP.read_ply_data(path, True, True)
-         labels  = np.where(labels == 2, 0, 1)
-         labels= labels.reshape(-1,1)
+         xyz, rgb = DP.read_ply_data(path, True, False)
+
+
          point_list = np.hstack((xyz,rgb))
-         point_list = np.hstack((point_list,labels))
+
 
          outportFileName= OUTPORT_PATH+"/"+filename.replace(".ply","")+".txt"
-         np.savetxt(outportFileName, point_list, fmt="%.5f,%.5f,%.5f,%d,%d,%d,%d",delimiter=' ')
+         np.savetxt(outportFileName, point_list, fmt="%.5f,%.5f,%.5f,%d,%d,%d",delimiter=' ')
 
 

@@ -193,8 +193,8 @@ def main(args):
             points, target = points.float().cuda(), target.long().cuda()
             points = points.transpose(2, 1)
 
-            #seg_pred 分类预测张量      trans_feat转换特征张量      根据NUM_CLASSES自动推断
-            seg_pred, trans_feat = classifier(points)
+            #seg_pred 分类预测值      trans_feat变换矩阵     根据NUM_CLASSES自动推断
+            seg_pred, trans_feat = classifier(points)                #shape （b， n ，C）
             seg_pred = seg_pred.contiguous().view(-1, NUM_CLASSES)
 
             batch_label = target.view(-1, 1)[:, 0].cpu().data.numpy()           #将原始目标张量中的标签值提取出来，并将它们保存在一个形状为(N,)的NumPy数组（其中N是批量大小和点数的乘积）中
@@ -238,6 +238,7 @@ def main(args):
             total_iou_deno_class = [0 for _ in range(NUM_CLASSES)]
             classifier = classifier.eval()
 
+            #使用测试集评估
             log_string('---- EPOCH %03d EVALUATION ----' % (global_epoch + 1))
             for i, (points, target) in tqdm(enumerate(testDataLoader), total=len(testDataLoader), smoothing=0.9):
                 points = points.data.numpy()

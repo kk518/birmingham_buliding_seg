@@ -87,18 +87,89 @@ class  BMHDataset(Dataset):
         selected_points[:, 3:6] /= 255.0                                                                                            #rgb归一化
         current_points[:, 0:6] = selected_points
         current_labels = labels[selected_point_idxs]
+
         if self.transform is not None:
             current_points, current_labels = self.transform(current_points, current_labels)
+
         return current_points, current_labels
 
     def __len__(self):
         return len(self.block_idxs)
 
 
-if __name__ == '__main__':
-    data_root = '../data/birmingham_npy'
-    num_point, test_area, block_size, sample_rate = 4096, [2,8], 1.0, 0.01
+#无标签数据加载
+class  BMHDataset_test(Dataset):
+    def __init__(self, split='test ', data_root='trainval_fullarea', num_point=4096, test_area=2, block_size=1.0,
+                 sample_rate=1.0, ):
+        super().__init__()
+        self.num_point = num_point
+        self.block_size = block_size
+        self.sample_rate = sample_rate
+        blocks = sorted(os.listdir(data_root))
+        blocks = [block for block in blocks if 'birmingham_' in block]  # 包含所有区块的列表
 
+        block_name = [block for block in blocks if  'birmingham_block_{}'.format(test_area) in block]    # 测试集
+
+        self.block_points = [] # 一个区块所有点     与  对应的标签的列表
+
+
+        block_path = os.path.join(data_root, block_name[0])  # 房间路径
+        block_data = np.loadtxt(block_path,delimiter=",")  # xyzrgb  N*6
+        #block_data = np.random.random((10000,6))
+        points = block_data[:, 0:6]  # xyzrgb, N*6;         #一个区块内的点
+        self.block_points.append(points)                          #一个区块内的点
+
+        self.coord_min, self.coord_max = np.amin(points, axis=0)[:3], np.amax(points, axis=0)[:3]  # xyz轴上的最大   最小值
+
+
+#一个区域采样次数
+        self.num_iter = int(block_data.shape[0]* sample_rate / num_point)  # 有多少个4096的个数
+
+        print("Totally {} samples in {} set.".format(self.num_iter, split))
+
+#样本数为len(self.room_idxs)
+    def __getitem__(self, idx):
+
+        start =  idx * self.num_point
+        end = (idx+1) *  self.num_point
+
+        points  = self.block_points[0]
+        points = points[ start : end , :  ]
+
+        # normalize     归一化
+        selected_points = points # num_point * 6  选择出的点
+        current_points = np.zeros((self.num_point, 9))  # num_point * 9
+
+        current_points[:, 6] = selected_points[:, 0] / self.coord_max[0]  # x归一化后存储到6
+        current_points[:, 7] = selected_points[:, 1] / self.coord_max[1] # y归一化
+        current_points[:, 8] = selected_points[:, 2] / self.coord_max[2] # z归一化
+
+        selected_points[:, 3:6] /= 255.0  # rgb归一化
+        current_points[:, 0:6] = selected_points
+
+
+        return current_points
+
+
+    def __len__(self):
+        return  self.num_iter
+
+
+
+
+
+if __name__ == '__main__':
+    data_root = '../data/birmingham_NO_lable'
+    num_point, test_area, block_size, sample_rate = 4096, 2 , 1.0, 0.01
+
+    point_data = BMHDataset_test(split='test', data_root=data_root, num_point=num_point, test_area=2,
+                            block_size=block_size, sample_rate=1)
+
+    print('point data size:', point_data.__len__())
+    print('point data 0 shape:', point_data.__getitem__(0)[0].shape)
+
+
+    data_root = '../data/birmingham_npy'
     point_data = BMHDataset(split='train', data_root=data_root, num_point=num_point, test_area=test_area, block_size=block_size, sample_rate=sample_rate, transform=None)
     print('point data size:', point_data.__len__())
     print('point data 0 shape:', point_data.__getitem__(0)[0].shape)
@@ -111,6 +182,7 @@ if __name__ == '__main__':
     torch.cuda.manual_seed_all(manual_seed)
     def worker_init_fn(worker_id):
         random.seed(manual_seed + worker_id)
+
     train_loader = torch.utils.data.DataLoader(point_data, batch_size=16, shuffle=True, num_workers=16, pin_memory=True)
     for idx in range(4):
         end = time.time()

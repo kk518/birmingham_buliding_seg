@@ -2,10 +2,10 @@ from tool import  DataProcessing as DP
 import  os
 import  numpy as np
 
-#讲PLY文件转为txt格式每行为  xyz rgb l     nx7
+#讲PLY文件转为txt格式每行为  xyz rgb 无标签
 
 IMPORT_PATH = "../data/birmingham"
-OUTPORT_PATH = "../data/birmingham_npy"
+OUTPORT_PATH = "../data/birmingham_NO_lable"
 
 def get_all_filenames(directory):
     filenames = []

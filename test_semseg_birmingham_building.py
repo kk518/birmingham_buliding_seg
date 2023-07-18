@@ -73,8 +73,7 @@ def main(args):
             points = points.transpose(2, 1)
 
             seg_pred, _= classifier(points)
-            seg_pred = seg_pred.contiguous().view(-1, NUM_CLASSES)
-            pred_choice = seg_pred.cpu().data.max(1)[1].numpy()
+            pred_choice = seg_pred.contiguous().cpu().data.max(2)[1].numpy()
             ALL_pred_label.extend(pred_choice.tolist())
 
     num = int(point_data.block_points[0].size/6) - len(ALL_pred_label)

@@ -45,6 +45,7 @@ class get_loss(torch.nn.Module):
 
 
 if __name__ == '__main__':
-    model = get_model(13)
-    xyz = torch.rand(12, 3, 2048)
-    (model(xyz))
+    model = get_model(2)
+    xyz = torch.rand(12, 9, 2048)
+    label ,trans_feat= model(xyz)
+    print(123)

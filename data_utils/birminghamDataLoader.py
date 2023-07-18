@@ -114,8 +114,8 @@ class  BMHDataset_test(Dataset):
 
 
         block_path = os.path.join(data_root, block_name[0])  # 房间路径
-        block_data = np.loadtxt(block_path,delimiter=",")  # xyzrgb  N*6
-        #block_data = np.random.random((10000,6))
+        #block_data = np.loadtxt(block_path,delimiter=",")  # xyzrgb  N*6
+        block_data = np.random.random((500000,6))
         points = block_data[:, 0:6]  # xyzrgb, N*6;         #一个区块内的点
         self.block_points.append(points)                          #一个区块内的点
 

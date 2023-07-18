@@ -94,7 +94,7 @@ def main(args):
 
     out_path = str(visual_dir)+"\\birmingham_block_"+str(Test_area)
     write_ply(out_path, [points, rgb, labels], ['x', 'y', 'z', 'red', 'green', 'blue', 'class'])
-    print(1)
+    print("处理完毕")
 
 
 

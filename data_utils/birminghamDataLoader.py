@@ -100,7 +100,7 @@ class  BMHDataset(Dataset):
 #无标签数据加载
 class  BMHDataset_test(Dataset):
     def __init__(self, split='test ', data_root='trainval_fullarea', num_point=4096, test_area=2, block_size=1.0,
-                 sample_rate=1.0, ):
+                 sample_rate=1.0):
         super().__init__()
         self.num_point = num_point
         self.block_size = block_size
@@ -110,12 +110,12 @@ class  BMHDataset_test(Dataset):
 
         block_name = [block for block in blocks if  'birmingham_block_{}'.format(test_area) in block]    # 测试集
 
-        self.block_points = [] # 一个区块所有点     与  对应的标签的列表
+        self.block_points = [] # 一个区块所有点
 
 
         block_path = os.path.join(data_root, block_name[0])  # 房间路径
-        #block_data = np.loadtxt(block_path,delimiter=",")  # xyzrgb  N*6
-        block_data = np.random.random((500000,6))
+        block_data = np.loadtxt(block_path,delimiter=",")  # xyzrgb  N*6
+        #block_data = np.random.random((500000,6))
         points = block_data[:, 0:6]  # xyzrgb, N*6;         #一个区块内的点
         self.block_points.append(points)                          #一个区块内的点
 
@@ -130,20 +130,33 @@ class  BMHDataset_test(Dataset):
 #样本数为len(self.room_idxs)
     def __getitem__(self, idx):
 
-        start =  idx * self.num_point
-        end = (idx+1) *  self.num_point
 
-        points  = self.block_points[0]
-        points = points[ start : end , :  ]
+        points = self.block_points[0]  # N * 6
+
+        N_points = points.shape[0]  # 点的数量
+        while (True):
+            center = points[np.random.choice(N_points)][:3]         #随机选择中心xyz坐标
+            block_min = center - [self.block_size / 2.0, self.block_size / 2.0, 0]
+            block_max = center + [self.block_size / 2.0, self.block_size / 2.0, 0]
+            point_idxs = np.where((points[:, 0] >= block_min[0]) & (points[:, 0] <= block_max[0]) & (points[:, 1] >= block_min[1]) & (points[:, 1] <= block_max[1]))[0]
+            if point_idxs.size > 1024:
+                break
+        if point_idxs.size >= self.num_point:
+            selected_point_idxs = np.random.choice(point_idxs, self.num_point, replace=False)
+        else:
+            selected_point_idxs = np.random.choice(point_idxs, self.num_point, replace=True)
+
+
 
         # normalize     归一化
-        selected_points = points # num_point * 6  选择出的点
+        selected_points = points[selected_point_idxs, :] # num_point * 6  选择出的点
         current_points = np.zeros((self.num_point, 9))  # num_point * 9
 
         current_points[:, 6] = selected_points[:, 0] / self.coord_max[0]  # x归一化后存储到6
         current_points[:, 7] = selected_points[:, 1] / self.coord_max[1] # y归一化
         current_points[:, 8] = selected_points[:, 2] / self.coord_max[2] # z归一化
-
+        selected_points[:, 0] = selected_points[:, 0] - center[0]  # 所有点在xy轴进行平移操作
+        selected_points[:, 1] = selected_points[:, 1] - center[1]
         selected_points[:, 3:6] /= 255.0  # rgb归一化
         current_points[:, 0:6] = selected_points
 
@@ -160,15 +173,19 @@ class  BMHDataset_test(Dataset):
 
 if __name__ == '__main__':
     data_root = '../data/birmingham_NO_lable'
-    num_point, test_area, block_size, sample_rate = 4096, 2 , 1.0, 0.01
+    num_point, test_area, block_size, sample_rate = 4096, 18 , 1.0, 1
 
-    point_data = BMHDataset_test(split='test', data_root=data_root, num_point=num_point, test_area=2,
-                            block_size=block_size, sample_rate=1)
+    point_data = BMHDataset_test(split='test', data_root=data_root, num_point=num_point, test_area=2, block_size=block_size, sample_rate=1)
+
+    import torch
+
+    train_loader =   torch.utils.data.DataLoader(point_data, batch_size=16, shuffle=True, num_workers=0, pin_memory=True)
+
 
     print('point data size:', point_data.__len__())
     print('point data 0 shape:', point_data.__getitem__(0)[0].shape)
 
-
+    num_point, test_area, block_size, sample_rate = 4096, 8, 1.0, 1
     data_root = '../data/birmingham_npy'
     point_data = BMHDataset(split='train', data_root=data_root, num_point=num_point, test_area=test_area, block_size=block_size, sample_rate=sample_rate, transform=None)
     print('point data size:', point_data.__len__())

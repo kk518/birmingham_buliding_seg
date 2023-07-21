@@ -45,7 +45,7 @@ def parse_args():
     parser.add_argument('--npoint', type=int, default=4096, help='Point Number [default: 4096]')
     parser.add_argument('--step_size', type=int, default=10, help='Decay step for lr decay [default: every 10 epochs]')
     parser.add_argument('--lr_decay', type=float, default=0.7, help='Decay rate for lr decay [default: 0.7]')
-    parser.add_argument('--test_area', type=int, default=[1,3], help='Which area to use for test, option: 1-6 [default: 5]')
+    parser.add_argument('--test_area', type=int, default=9, help='Which area to use for test, option: 1-6 [default: 5]')
 
     return parser.parse_args()
 
@@ -88,23 +88,23 @@ def main(args):
     log_string('PARAMETER ...')
     log_string(args)
 
-    root = 'data/birmingham_npy'
+    root = 'data/birmingham_npy2'
     NUM_CLASSES = 2
     NUM_POINT = args.npoint
     BATCH_SIZE = args.batch_size
 
     print("start loading training data ...")
-    TRAIN_DATASET = BMHDataset(split='train', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=1, transform=None)
+    TRAIN_DATASET = BMHDataset(split='train', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=0.01, transform=None)
     print("start loading test data ...")
-    TEST_DATASET = BMHDataset(split='test', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=1, transform=None)
+    TEST_DATASET = BMHDataset(split='test', data_root=root, num_point=NUM_POINT, test_area=args.test_area, block_size=1.0, sample_rate=0.01, transform=None)
 
-    # trainDataLoader = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=10,
-    #                                               pin_memory=True, drop_last=False,
-    #                                               worker_init_fn=lambda x: np.random.seed(x + int(time.time())))
-    trainDataLoader = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=10,
-                                                  pin_memory=True, drop_last=False)
-    testDataLoader = torch.utils.data.DataLoader(TEST_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=10,
+    trainDataLoader = torch.utils.data.DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=0,
+                                                  pin_memory=True, drop_last=False,
+                                                  worker_init_fn=lambda x: np.random.seed(x + int(time.time())))
+
+    testDataLoader = torch.utils.data.DataLoader(TEST_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=0,
                                                  pin_memory=True, drop_last=False)
+
     weights = torch.Tensor(TRAIN_DATASET.labelweights).cuda()
 
     log_string("The number of training data is: %d" % len(TRAIN_DATASET))

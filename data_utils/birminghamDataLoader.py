@@ -3,6 +3,7 @@ import numpy as np
 
 from tqdm import tqdm
 from torch.utils.data import Dataset
+import time
 
 class  BMHDataset(Dataset):
     def __init__(self, split='train', data_root='trainval_fullarea', num_point=4096, test_area=[9,10], block_size=1.0,
@@ -84,7 +85,7 @@ class  BMHDataset(Dataset):
         current_points[:, 8] = selected_points[:, 2] / self.block_coord_max[block_idx][2]         #z归一化
         selected_points[:, 0] = selected_points[:, 0] - center[0]                                   #所有点在xy轴进行平移操作
         selected_points[:, 1] = selected_points[:, 1] - center[1]
-        selected_points[:, 3:6] /= 255.0                                                                                            #rgb归一化
+        selected_points[:, 3:6] /= 255.0  #rgb归一化
         current_points[:, 0:6] = selected_points
         current_labels = labels[selected_point_idxs]
 
@@ -99,7 +100,7 @@ class  BMHDataset(Dataset):
 
 #无标签数据加载
 class  BMHDataset_test(Dataset):
-    def __init__(self, split='test ', data_root='trainval_fullarea', num_point=4096, test_area=2, block_size=1.0,
+    def __init__(self, split='test ', data_root='trainval_fullarea', num_point=256, test_area=18, block_size=1.0,
                  sample_rate=1.0):
         super().__init__()
         self.num_point = num_point
@@ -113,8 +114,13 @@ class  BMHDataset_test(Dataset):
         self.block_points = [] # 一个区块所有点
 
 
-        block_path = os.path.join(data_root, block_name[0])  # 房间路径
+        block_path = os.path.join(data_root, block_name[0])  # 区块路径
+        print("加载数据")
+        start_time = time.time()
         block_data = np.loadtxt(block_path,delimiter=",")  # xyzrgb  N*6
+        end_time = time.time()
+        print("加载数据完成用时："+str(end_time-start_time)+"s")
+
         #block_data = np.random.random((500000,6))
         points = block_data[:, 0:6]  # xyzrgb, N*6;         #一个区块内的点
         self.block_points.append(points)                          #一个区块内的点
@@ -123,7 +129,7 @@ class  BMHDataset_test(Dataset):
 
 
 #一个区域采样次数
-        self.num_iter = int(block_data.shape[0]* sample_rate / num_point)  # 有多少个4096的个数
+        self.num_iter = int(block_data.shape[0]* sample_rate / num_point)  # 有多少个num_point的个数
 
         print("Totally {} samples in {} set.".format(self.num_iter, split))
 
@@ -134,12 +140,13 @@ class  BMHDataset_test(Dataset):
         points = self.block_points[0]  # N * 6
 
         N_points = points.shape[0]  # 点的数量
+        #print("点的数量："+str(N_points))
         while (True):
             center = points[np.random.choice(N_points)][:3]         #随机选择中心xyz坐标
             block_min = center - [self.block_size / 2.0, self.block_size / 2.0, 0]
             block_max = center + [self.block_size / 2.0, self.block_size / 2.0, 0]
             point_idxs = np.where((points[:, 0] >= block_min[0]) & (points[:, 0] <= block_max[0]) & (points[:, 1] >= block_min[1]) & (points[:, 1] <= block_max[1]))[0]
-            if point_idxs.size > 1024:
+            if point_idxs.size >= 512:
                 break
         if point_idxs.size >= self.num_point:
             selected_point_idxs = np.random.choice(point_idxs, self.num_point, replace=False)
@@ -149,6 +156,7 @@ class  BMHDataset_test(Dataset):
 
 
         # normalize     归一化
+        select_points =  points[selected_point_idxs, :]
         selected_points = points[selected_point_idxs, :] # num_point * 6  选择出的点
         current_points = np.zeros((self.num_point, 9))  # num_point * 9
 
@@ -161,8 +169,7 @@ class  BMHDataset_test(Dataset):
         current_points[:, 0:6] = selected_points
 
 
-        return current_points
-
+        return  current_points , select_points
 
     def __len__(self):
         return  self.num_iter
@@ -175,7 +182,7 @@ if __name__ == '__main__':
     data_root = '../data/birmingham_NO_lable'
     num_point, test_area, block_size, sample_rate = 4096, 18 , 1.0, 1
 
-    point_data = BMHDataset_test(split='test', data_root=data_root, num_point=num_point, test_area=2, block_size=block_size, sample_rate=1)
+    point_data = BMHDataset_test(split='test', data_root=data_root, num_point=num_point, test_area=test_area, block_size=block_size, sample_rate=1)
 
     import torch
 

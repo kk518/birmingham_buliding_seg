@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from time import time
 import numpy as np
+from CBAMLayer import  CBAMLayer
 
 
 # # new_points [B, 3+D, nsample,npoint]     选取的中心点new_xyz [B, npoint, C]
@@ -19,6 +20,7 @@ import numpy as np
 #
 #     return new_points
 # new_points [B, 3+D, nsample,npoint]     选取的中心点new_xyz [B, npoint, C]
+#返回relative_feature [b,npoint,nsample,d]   d=10  欧式距离1 坐标差3 中心点3 相邻点3
 def relative_pos_encoding(new_xyz, new_points):
 
     neighbor_xyz = new_points[:,:3,:,:]
@@ -30,11 +32,11 @@ def relative_pos_encoding(new_xyz, new_points):
     relative_feature = torch.cat([relative_dis, relative_xyz, xyz_tile, neighbor_xyz], dim=-1)
     return relative_feature
 
-if __name__ == '__main__':
-    new_xyz = torch.ones([1, 128, 3])
-    new_points = torch.ones([1, 6, 32, 128])
-    relative_feature =  relative_pos_encoding(new_xyz,new_points)
-    print(relative_feature.shape)
+# if __name__ == '__main__':
+#     new_xyz = torch.ones([1, 128, 3])
+#     new_points = torch.ones([1, 6, 32, 128])
+#     relative_feature =  relative_pos_encoding(new_xyz,new_points)
+#     print(relative_feature.shape)  # [b,npoint,nsample,d]
 
 def timeit(tag, t):
     print("{}: {}s".format(tag, time() - t))
@@ -275,20 +277,55 @@ class PointNetSetAbstraction(nn.Module):         #降采样
         return new_xyz, new_points
 
 
+
 class PointNetSetAbstraction_new(nn.Module):  # 降采样
     # npoint 采样数, radius 半径,  nsample 半径内采样点数量 , in_channel 9 + 3输入通道 , mlp [32, 32, 64]  , group_all
-    def __init__(self, npoint, radius, nsample, in_channel, mlp, group_all):
-        super(PointNetSetAbstraction, self).__init__()
+    def __init__(self, npoint, radius, nsample , group_all):
+        super( PointNetSetAbstraction_new,self).__init__()
         self.npoint = npoint
         self.radius = radius
         self.nsample = nsample
-        self.mlp_convs = nn.ModuleList()
-        self.mlp_bns = nn.ModuleList()
-        last_channel = in_channel
-        for out_channel in mlp:
-            self.mlp_convs.append(nn.Conv2d(last_channel, out_channel, 1))
-            self.mlp_bns.append(nn.BatchNorm2d(out_channel))
-            last_channel = out_channel
+        self.conv_layers1 = nn.ModuleList([
+            nn.Conv2d(10, 16, kernel_size=(1,1)),
+            nn.BatchNorm2d(16),
+            nn.ReLU(),
+            nn.Conv2d(16, 28, kernel_size=1),
+            nn.BatchNorm2d(28),
+            nn.ReLU(),
+        ])
+        self.conv_layers2 = nn.ModuleList([
+            nn.Conv2d(3, 9, kernel_size=1),
+            nn.BatchNorm2d(9),
+            nn.ReLU(),
+            nn.Conv2d(9, 18, kernel_size=1),
+            nn.BatchNorm2d(18),
+            nn.ReLU()
+        ])
+        self.cbam = CBAMLayer(64)
+
+        self.conv_layers3 = nn.ModuleList([
+            nn.Conv2d(13, 32, kernel_size=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU()
+        ])
+        self.conv_layers4 = nn.ModuleList([
+            nn.Conv2d(128, 64, kernel_size=(1, 1)),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+        ])
+
+
+        # self.mlp_convs = nn.ModuleList()
+        # self.mlp_bns = nn.ModuleList()
+        # last_channel = in_channel
+        # for out_channel in mlp:
+        #     self.mlp_convs.append(nn.Conv2d(last_channel, out_channel, 1))
+        #     self.mlp_bns.append(nn.BatchNorm2d(out_channel))
+        #     last_channel = out_channel
+
         self.group_all = group_all
 
     def forward(self, xyz, points):
@@ -311,20 +348,64 @@ class PointNetSetAbstraction_new(nn.Module):  # 降采样
         # new_xyz: sampled points position data, [B, npoint, C]                             #采样点的位置坐标信息
         # new_points: sampled points data, [B, npoint, nsample, 3+D]                #所有分组的采样点信息   点数npoint* nsample  3+D 通道数
         new_points = new_points.permute(0, 3, 2, 1)  # [B, 3+D, nsample,npoint]   #所有的点  采样关键点以及分组后的点
+        new_points_xyz = new_points[:,:3,:,:]
+        new_points_rgb = new_points[:,3:6,:,:]
+        new_points_rgb3 = new_points_rgb
+        #局部空间位置编码  局部空间位置特征new_points_pos_encoding
+        new_points_pos_encoding =  relative_pos_encoding(new_xyz,new_points)  #[b,npoint,nsample,10]
+        new_points_pos_encoding10 = new_points_pos_encoding.permute(0,3,2,1)
+        #局部位置空间特征mlp
+        new_points_pos_encoding = new_points_pos_encoding.permute(0,3,1,2)
+        for layer in self.conv_layers1:
+            new_points_pos_encoding = layer(new_points_pos_encoding)
+        new_points_pos_encoding = new_points_pos_encoding.permute(0, 1, 3, 2)
+        #相邻点位置空间特征mlp
+        for layer in self.conv_layers2:
+            new_points_xyz = layer(new_points_xyz)
 
-        #局部空间位置编码
+
+        #相邻点色彩空间特征mlp
+        for layer in self.conv_layers2:
+            new_points_rgb = layer(new_points_rgb)
 
 
-        # 对局部group中的每个点逐点mlp
+        #全局点云特征
+        all_points_feature = torch.cat((new_points_pos_encoding,new_points_xyz,new_points_rgb),dim=1)
 
-        for i, conv in enumerate(self.mlp_convs):
-            bn = self.mlp_bns[i]
-            new_points = F.relu(bn(conv(new_points)))
+        #cbam操作 全局点云特征
+        b,c,ns,np= all_points_feature.shape
+        all_points_feature = all_points_feature.reshape(b,c,ns*np)
+        all_points_feature = self.cbam(all_points_feature)  # [b,64,ns,np]
+        all_points_feature = all_points_feature.reshape(b,c,ns,np)
 
-        # 先对每一个点做mlp再最大池化得到全局特征  最大池化是在nsample 维度上进行的
-        new_points = torch.max(new_points, 2)[0]  # [B, D' ,npoint]
+        #最大池化获取全局特征
+        all_points_feature = torch.max(all_points_feature, 2)[0]   # [b,64,1,np]
+        all_points_feature = torch.unsqueeze(all_points_feature,2)
+        #注意力池化
+        points_feature = torch.cat((new_points_pos_encoding10,new_points_rgb3),dim=1)  #[b,13,ns,np]
+        for layer in self.conv_layers3:
+            points_feature = layer(points_feature)    #64
+
+        b, c, ns, np = points_feature.shape
+        points_feature = points_feature.reshape(b, c, ns * np)
+        points_feature = self.cbam(points_feature)
+        points_feature = points_feature.reshape(b, c, ns, np)
+            # [b,64,ns,np]
+
+        #求和池化
+        points_feature = torch.sum(points_feature,dim=2, keepdim=True)  # [b,64,1,np]
+
+        attentionPool_points = torch.cat((all_points_feature,points_feature),dim=1)
+
+        for layer in self.conv_layers4:
+            attentionPool_points = layer(attentionPool_points)  # [b,64,1,np]
+
         new_xyz = new_xyz.permute(0, 2, 1)  # [B, C, npoint]
-        return new_xyz, new_points
+        attentionPool_points = attentionPool_points.squeeze(dim=2)
+        return new_xyz, attentionPool_points
+
+
+
 
 "msg 多半径 " \
 "npoint 采样个数" \

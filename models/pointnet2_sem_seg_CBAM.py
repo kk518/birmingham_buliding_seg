@@ -1,15 +1,18 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from models.pointnet2_utils import PointNetSetAbstraction,PointNetFeaturePropagation
+from models.pointnet2_utils import PointNetSetAbstraction,PointNetFeaturePropagation,PointNetSetAbstraction_new
+
+from CBAMLayer import CBAMLayer
 
 
 class get_model(nn.Module):
     def __init__(self, num_classes):
         super(get_model, self).__init__()
-        self.sa1 = PointNetSetAbstraction(1024, 0.1, 32, 9 + 3, [32, 32, 64], False)            #npoint 采样数, radius 半径, nsample 半径内采样点数量, in_channel, mlp, group_all
+        self.sa1 = PointNetSetAbstraction_new(1024, 0.1, 32 , False)            #npoint 采样数, radius 半径, nsample 半径内采样点数量, in_channel, mlp, group_all
         self.sa2 = PointNetSetAbstraction(256, 0.2, 32, 64 + 3, [64, 64, 128], False)
         self.sa3 = PointNetSetAbstraction(64, 0.4, 32, 128 + 3, [128, 128, 256], False)
         self.sa4 = PointNetSetAbstraction(16, 0.8, 32, 256 + 3, [256, 256, 512], False)
+
         self.fp4 = PointNetFeaturePropagation(768, [256, 256])
         self.fp3 = PointNetFeaturePropagation(384, [256, 256])
         self.fp2 = PointNetFeaturePropagation(320, [256, 128])
@@ -20,7 +23,7 @@ class get_model(nn.Module):
         self.conv2 = nn.Conv1d(128, num_classes, 1)
 
 
-    def forward(self, xyz):      #仅接收xyz   shape （b， n ，C）
+    def forward(self, xyz):      #仅接收xyz   shape （b， C ，n）
         l0_xyz = xyz[:,:3,:]        #仅有xyz位置信息
         l0_points = xyz             #包含xyzrgb信息
 
@@ -51,6 +54,7 @@ class get_loss(nn.Module):
 
 if __name__ == '__main__':
     import  torch
-    model = get_model(13)
-    xyz = torch.rand(6, 9, 2048)
-    (model(xyz))
+    model = get_model(2)
+    xyz = torch.rand(6, 6, 2048)
+    xyz,_ =  model(xyz)
+    print(xyz.shape)

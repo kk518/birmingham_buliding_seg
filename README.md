@@ -1,0 +1,1 @@
+[1] Huang L , Wan F , Lei G ,et al.SCA-PointNet++: Fusion Spatial-Channel Attention for Point Cloud Extraction Network of Buildings in Outdoor Scenes[C]//2023 3rd International Conference on Computer Science, Electronic Information Engineering and Intelligent Control Technology (CEI).0[2024-08-09].DOI:10.1109/CEI60616.2023.10528085.
